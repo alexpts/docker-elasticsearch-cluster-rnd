@@ -1,0 +1,53 @@
+# ключ поля с датой, если не передан, то vector создат такое поле сам и текущую дату подставит
+log_schema.timestamp_key = "ts"
+log_schema.message_key = "msg"
+log_schema.source_type_key = "src"
+
+# web gui
+[api]
+enabled = false
+#address = "0.0.0.0:8686"
+
+
+# генератор демо логов
+[sources.fake_generator]
+type = "demo_logs"
+decoding.codec = "bytes"
+format = "json"
+#count = 100000
+interval = 0.1
+sequence = true
+
+# transforms pipe, который берет из sources канала данные
+[transforms.json_parser]
+inputs = ["fake_generator"]
+type = "remap"
+drop_on_abort = false
+drop_on_error = false
+reroute_dropped = true
+file = "/etc/vector/remap-log.vrl"
+
+# выход
+[sinks.es]
+inputs = ["json_parser"]
+type = "elasticsearch"
+mode = "bulk"
+api_version = "v8"
+acknowledgements.enabled = true
+bulk.index = "vector-{{ _vector._es_index }}-%Y.%m.%d" # https://docs.rs/chrono/0.4.19/chrono/format/strftime/index.html#specifiers
+#index = "{{ _es_index }}"
+#endpoints = "${ES_HOST}"  # указывается с протоколом и портом
+endpoints = ["http://es1:9200", "http://es2:9200", "http://es3:9200"]
+compression = "gzip"
+batch.timeout_secs = 1
+encoding.except_fields = ["_vector._es_index", "_vector.host"]
+
+#[sinks.console]
+#type = "console" # required
+#inputs =  [
+#    #"udp_socket",
+#    "json_parser",
+#    "json_parser.dropped", # reroute from {{ name }}.dropped
+#]
+#target = "stdout"
+#encoding.codec = "json"

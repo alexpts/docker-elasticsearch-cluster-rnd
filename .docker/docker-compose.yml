@@ -1,0 +1,59 @@
+version: "2.4"
+
+services:
+  es1:
+    image: docker.elastic.co/elasticsearch/elasticsearch:${ES_STACK_VERSION:-8.9.11}
+    mem_limit: 2048m
+    ports: ['127.0.0.1:9200:9200']
+    environment:
+      - network.host=0.0.0.0
+      - node.name=es1
+      - cluster.name=${CLUSTER_NAME:-es-rnd-cluster}
+      - discovery.type=multi-node
+      - xpack.security.enabled=false
+      - discovery.seed_hosts=es1,es2,es3 # обнаруживаемые хосты
+      - "ES_JAVA_OPTS=-Xms1g -Xmx1g"
+      - cluster.initial_master_nodes=es1
+
+  es2:
+    image: docker.elastic.co/elasticsearch/elasticsearch:${ES_STACK_VERSION:-8.9.11}
+    mem_limit: 2048m
+    ports: ['127.0.0.1:29200:9200']
+    environment:
+      - cluster.name=${CLUSTER_NAME:-es-rnd-cluster}
+      - node.name=es2
+      - xpack.security.enabled=false
+      - network.host=0.0.0.0
+      - discovery.seed_hosts=es1,es2,es3
+      - "ES_JAVA_OPTS=-Xms1g -Xmx1g"
+
+  es3:
+    image: docker.elastic.co/elasticsearch/elasticsearch:${ES_STACK_VERSION:-8.9.11}
+    mem_limit: 2048m
+    ports: ['127.0.0.1:39200:9200']
+    environment:
+      - cluster.name=${CLUSTER_NAME:-es-rnd-cluster}
+      - node.name=es3
+      - xpack.security.enabled=false
+      - network.host=0.0.0.0
+      - discovery.seed_hosts=es1,es2,es3
+      - "ES_JAVA_OPTS=-Xms1g -Xmx1g"
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:${ES_STACK_VERSION:-8.9.1}
+    mem_limit: 1024m
+    environment:
+      ELASTICSEARCH_HOSTS: http://es1:9200
+      ES_JAVA_OPTS: -Xms512m -Xmx512m
+    ports: ['127.0.0.1:5601:5601']
+
+  vector:
+    image: timberio/vector:0.32.1-alpine
+    mem_limit: 64m
+    restart: always
+    depends_on:
+      - es1
+    volumes:
+      - ./vector/vector.toml:/etc/vector/vector.toml:ro
+      - ./vector/remap-log.vrl:/etc/vector/remap-log.vrl:ro
+    #ports: [ '127.0.0.1:12201:12201/udp' ]
